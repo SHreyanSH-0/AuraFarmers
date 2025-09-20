@@ -53,7 +53,7 @@ export const useUser = () => {
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [profile, setProfile] = useState<UserProfile>({
-    name: 'Rajesh Kumar',
+    name: 'Shreyanh Tiwari',
     location: 'Kurnool, Andhra Pradesh',
     farmSize: '2.5 acres',
     primaryCrop: 'Cotton',

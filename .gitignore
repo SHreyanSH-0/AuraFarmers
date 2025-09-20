@@ -1,0 +1,48 @@
+# Node.js dependencies
+Backend/node_modules/
+FrontEnd/node_modules/
+Backend/npm-debug.log*
+Backend/yarn-debug.log*
+Backend/yarn-error.log*
+Backend/pnpm-debug.log*
+Backend/package-lock.json
+Backend/yarn.lock
+Backend/pnpm-lock.yaml
+
+# Build output
+Backend/dist/
+Backend/build/
+Backend/.next/
+Backend/out/
+Backend/.cache/
+
+# Frontend specific
+Frontend/.vite/
+Frontend/.turbo/
+Frontend/.nuxt/
+Frontend/.parcel-cache/
+Frontend/.eslintcache
+
+# Backend specific
+Backend/.tsbuildinfo
+Backend/firebase-service-account.json
+
+# Environment variables
+Backend/.env
+Backend/.env.local
+Backend/.env.development.local
+Backend/.env.test.local
+Backend/.env.production.local
+
+# IDE / OS
+Backend/.vscode/
+Backend/.idea/
+Backend/.DS_Store
+Backend/Thumbs.db
+Backend/*.swp
+Backend/*.swo
+
+# Logs
+Backend/logs
+Backend/*.log
+Backend/*.log.*

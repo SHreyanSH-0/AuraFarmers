@@ -9,5 +9,47 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- ✅ Botpress widget scripts -->
+    <script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
+    <script>
+      window.addEventListener("DOMContentLoaded", () => {
+        // Initialize Botpress chat
+        window.botpress.init({
+          botId: "12fc5280-d9f2-404d-a9d1-b56529d1242b",
+          clientId: "08ceed91-a89b-4d17-b8b9-8200bad5d862",
+          configuration: {
+            hideWidget: true,   // ✅ Hides the floating bubble
+            botName: "Aura Support Agent",
+            botAvatar: "https://files.bpcontent.cloud/2025/09/20/11/20250920110512-Z5HM1SRM.png",
+            botDescription: "I can help you with your Aura Farmers platform questions, guide you through challenges, and assist with any support requests.",
+            website: {
+              title: "Website",
+              link: "https://aura-farmers-clone.web.app"
+            },
+            color: "#16B16A",
+            variant: "solid",
+            headerVariant: "glass",
+            themeMode: "light",
+            fontFamily: "inter",
+            radius: 2.5,
+            feedbackEnabled: true,
+            footer: "[⚡ by Botpress](https://botpress.com/?from=webchat)",
+            soundEnabled: true
+          }
+        });
+
+        // Attach Ask AI button click
+        const askAiBtn = document.querySelector("a[href='/ask-ai'], .ask-ai-btn, .navbar-ask-ai");
+        if (askAiBtn) {
+          askAiBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            if (window.botpress) {
+              window.botpress.open(); // ✅ Opens chatbot only when Ask AI is clicked
+            }
+          });
+        }
+      });
+    </script>
   </body>
 </html>

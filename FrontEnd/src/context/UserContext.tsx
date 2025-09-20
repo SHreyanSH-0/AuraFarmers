@@ -1,13 +1,16 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { doc, getDoc, setDoc, updateDoc, collection, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
+import { useAuth } from "./AuthContext";
 
 interface Mission {
   id: string;
   title: string;
   description: string;
-  category: 'organic' | 'water' | 'soil' | 'biodiversity';
+  category: "organic" | "water" | "soil" | "biodiversity";
   points: number;
   duration: string;
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: "easy" | "medium" | "hard";
   completed: boolean;
   progress: number;
 }
@@ -33,12 +36,13 @@ interface UserProfile {
 }
 
 interface UserContextType {
-  profile: UserProfile;
+  profile: UserProfile | null;
   missions: Mission[];
   badges: Badge[];
-  updateProfile: (profile: Partial<UserProfile>) => void;
-  completeMission: (missionId: string) => void;
-  updateMissionProgress: (missionId: string, progress: number) => void;
+  loading: boolean;
+  updateProfile: (profile: Partial<UserProfile>) => Promise<void>;
+  completeMission: (missionId: string) => Promise<void>;
+  updateMissionProgress: (missionId: string, progress: number) => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -46,125 +50,112 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 export const useUser = () => {
   const context = useContext(UserContext);
   if (!context) {
-    throw new Error('useUser must be used within a UserProvider');
+    throw new Error("useUser must be used within a UserProvider");
   }
   return context;
 };
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [profile, setProfile] = useState<UserProfile>({
-    name: 'Shreyanh Tiwari',
-    location: 'Kurnool, Andhra Pradesh',
-    farmSize: '2.5 acres',
-    primaryCrop: 'Cotton',
-    sustainabilityScore: 750,
-    level: 3,
-    totalPoints: 2450,
-    rank: 15,
-  });
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [badges, setBadges] = useState<Badge[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [missions, setMissions] = useState<Mission[]>([
-    {
-      id: '1',
-      title: 'Organic Pest Control Challenge',
-      description: 'Use neem oil spray for 2 weeks instead of chemical pesticides',
-      category: 'organic',
-      points: 150,
-      duration: '2 weeks',
-      difficulty: 'easy',
-      completed: false,
-      progress: 30,
-    },
-    {
-      id: '2',
-      title: 'Water Conservation Mission',
-      description: 'Implement drip irrigation in at least 0.5 acres',
-      category: 'water',
-      points: 300,
-      duration: '1 month',
-      difficulty: 'medium',
-      completed: false,
-      progress: 0,
-    },
-    {
-      id: '3',
-      title: 'Soil Health Booster',
-      description: 'Apply organic compost and test soil pH levels',
-      category: 'soil',
-      points: 200,
-      duration: '3 weeks',
-      difficulty: 'medium',
-      completed: true,
-      progress: 100,
-    },
-    {
-      id: '4',
-      title: 'Crop Diversification Quest',
-      description: 'Plant intercrop with legumes to improve soil nitrogen',
-      category: 'biodiversity',
-      points: 250,
-      duration: '1 season',
-      difficulty: 'hard',
-      completed: false,
-      progress: 60,
-    },
-  ]);
+  // Fetch both user data + global missions
+  useEffect(() => {
+    if (!user) {
+      setProfile(null);
+      setMissions([]);
+      setBadges([]);
+      setLoading(false);
+      return;
+    }
 
-  const [badges, setBadges] = useState<Badge[]>([
-    {
-      id: '1',
-      name: 'Organic Pioneer',
-      icon: '🌱',
-      description: 'Completed first organic farming mission',
-      earned: true,
-      dateEarned: '2024-01-15',
-    },
-    {
-      id: '2',
-      name: 'Water Warrior',
-      icon: '💧',
-      description: 'Saved 1000+ liters of water through conservation',
-      earned: false,
-    },
-    {
-      id: '3',
-      name: 'Soil Guardian',
-      icon: '🌍',
-      description: 'Improved soil health metrics by 20%',
-      earned: true,
-      dateEarned: '2024-01-08',
-    },
-    {
-      id: '4',
-      name: 'Community Leader',
-      icon: '👥',
-      description: 'Helped 5 farmers adopt sustainable practices',
-      earned: false,
-    },
-  ]);
+    let unsubMissions: (() => void) | null = null;
 
-  const updateProfile = (newProfile: Partial<UserProfile>) => {
-    setProfile(prev => ({ ...prev, ...newProfile }));
+    const fetchData = async () => {
+      try {
+        // User document
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+
+        let userData: any = {};
+        if (userSnap.exists()) {
+          userData = userSnap.data();
+          setProfile(userData.profile || null);
+          setBadges(userData.badges || []);
+        } else {
+          console.warn("User doc not found in Firestore");
+          // Create a blank user doc on first login
+          await setDoc(userRef, { profile: {}, missions: [], badges: [] });
+        }
+
+        // Global missions listener
+        unsubMissions = onSnapshot(collection(db, "missions"), (snapshot) => {
+          const globalMissions = snapshot.docs.map(
+            (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Omit<Mission, "completed" | "progress">)
+          );
+
+          // Merge global missions with user’s progress
+          const userMissions: Mission[] = globalMissions.map((gm) => {
+            const progressData = (userData.missions || []).find((m: Mission) => m.id === gm.id);
+            return {
+              ...gm,
+              completed: progressData?.completed || false,
+              progress: progressData?.progress || 0,
+            };
+          });
+
+          setMissions(userMissions);
+        });
+      } catch (err) {
+        console.error("Error fetching user data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      if (unsubMissions) unsubMissions();
+    };
+  }, [user]);
+
+  // Update profile in Firestore
+  const updateProfile = async (newProfile: Partial<UserProfile>) => {
+    if (!user) return;
+    const userRef = doc(db, "users", user.uid);
+
+    const updated = { ...profile, ...newProfile } as UserProfile;
+    setProfile(updated);
+
+    await updateDoc(userRef, { profile: updated });
   };
 
-  const completeMission = (missionId: string) => {
-    setMissions(prev =>
-      prev.map(mission =>
-        mission.id === missionId
-          ? { ...mission, completed: true, progress: 100 }
-          : mission
-      )
+  // Mark mission as completed
+  const completeMission = async (missionId: string) => {
+    if (!user) return;
+    const updatedMissions = missions.map((mission) =>
+      mission.id === missionId ? { ...mission, completed: true, progress: 100 } : mission
     );
+    setMissions(updatedMissions);
+
+    const userRef = doc(db, "users", user.uid);
+    await updateDoc(userRef, { missions: updatedMissions });
   };
 
-  const updateMissionProgress = (missionId: string, progress: number) => {
-    setMissions(prev =>
-      prev.map(mission =>
-        mission.id === missionId
-          ? { ...mission, progress: Math.min(100, progress) }
-          : mission
-      )
+  // Update mission progress
+  const updateMissionProgress = async (missionId: string, progress: number) => {
+    if (!user) return;
+    const updatedMissions = missions.map((mission) =>
+      mission.id === missionId ? { ...mission, progress: Math.min(100, progress) } : mission
     );
+    setMissions(updatedMissions);
+
+    const userRef = doc(db, "users", user.uid);
+    await updateDoc(userRef, { missions: updatedMissions });
   };
 
   return (
@@ -173,6 +164,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         profile,
         missions,
         badges,
+        loading,
         updateProfile,
         completeMission,
         updateMissionProgress,

@@ -4,7 +4,15 @@ import { useUser } from '../context/UserContext';
 import BadgeDisplay from './BadgeDisplay';
 
 const Profile: React.FC = () => {
-  const { profile, badges, updateProfile } = useUser();
+  const { profile, badges, updateProfile, loading } = useUser();
+
+if (loading) {
+  return <p>Loading...</p>;
+}
+
+if (!profile) {
+  return <p>No profile found</p>;
+}
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     name: profile.name,

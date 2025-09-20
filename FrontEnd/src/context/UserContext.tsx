@@ -13,6 +13,7 @@ interface Mission {
   difficulty: "easy" | "medium" | "hard";
   completed: boolean;
   progress: number;
+  accepted: boolean;
 }
 
 interface Badge {
@@ -41,6 +42,7 @@ interface UserContextType {
   badges: Badge[];
   loading: boolean;
   updateProfile: (profile: Partial<UserProfile>) => Promise<void>;
+  acceptMission: (missionId: string) => Promise<void>;
   completeMission: (missionId: string) => Promise<void>;
   updateMissionProgress: (missionId: string, progress: number) => Promise<void>;
 }
@@ -62,7 +64,6 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [badges, setBadges] = useState<Badge[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch both user data + global missions
   useEffect(() => {
     if (!user) {
       setProfile(null);
@@ -76,7 +77,6 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const fetchData = async () => {
       try {
-        // User document
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
 
@@ -86,28 +86,33 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setProfile(userData.profile || null);
           setBadges(userData.badges || []);
         } else {
-          console.warn("User doc not found in Firestore");
-          // Create a blank user doc on first login
           await setDoc(userRef, { profile: {}, missions: [], badges: [] });
         }
 
-        // Global missions listener
+        // ✅ Fetch global missions
         unsubMissions = onSnapshot(collection(db, "missions"), (snapshot) => {
           const globalMissions = snapshot.docs.map(
-            (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Omit<Mission, "completed" | "progress">)
+            (docSnap) =>
+              ({
+                id: docSnap.id,
+                ...docSnap.data(),
+              } as Omit<Mission, "completed" | "progress" | "accepted">)
           );
 
-          // Merge global missions with user’s progress
-          const userMissions: Mission[] = globalMissions.map((gm) => {
-            const progressData = (userData.missions || []).find((m: Mission) => m.id === gm.id);
+          // ✅ Merge with only the user’s accepted missions
+          const userAcceptedMissions: Mission[] = userData.missions || [];
+
+          const merged: Mission[] = globalMissions.map((gm) => {
+            const progressData = userAcceptedMissions.find((m) => m.id === gm.id);
             return {
               ...gm,
               completed: progressData?.completed || false,
               progress: progressData?.progress || 0,
+              accepted: progressData?.accepted || false,
             };
           });
 
-          setMissions(userMissions);
+          setMissions(merged);
         });
       } catch (err) {
         console.error("Error fetching user data:", err);
@@ -117,45 +122,61 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     fetchData();
-
     return () => {
       if (unsubMissions) unsubMissions();
     };
   }, [user]);
 
-  // Update profile in Firestore
+  // ✅ Update profile
   const updateProfile = async (newProfile: Partial<UserProfile>) => {
     if (!user) return;
     const userRef = doc(db, "users", user.uid);
-
     const updated = { ...profile, ...newProfile } as UserProfile;
     setProfile(updated);
-
     await updateDoc(userRef, { profile: updated });
   };
 
-  // Mark mission as completed
+  // ✅ Accept mission (only add this mission to user doc, don’t overwrite global list)
+  const acceptMission = async (missionId: string) => {
+    if (!user) return;
+
+    const updatedMissions = missions.map((mission) =>
+      mission.id === missionId ? { ...mission, accepted: true, progress: 0 } : mission
+    );
+    setMissions(updatedMissions);
+
+    const acceptedOnly = updatedMissions.filter((m) => m.accepted);
+    const userRef = doc(db, "users", user.uid);
+    await updateDoc(userRef, { missions: acceptedOnly });
+    
+  };
+
+  // ✅ Complete mission
   const completeMission = async (missionId: string) => {
     if (!user) return;
+
     const updatedMissions = missions.map((mission) =>
       mission.id === missionId ? { ...mission, completed: true, progress: 100 } : mission
     );
     setMissions(updatedMissions);
 
+    const acceptedOnly = updatedMissions.filter((m) => m.accepted);
     const userRef = doc(db, "users", user.uid);
-    await updateDoc(userRef, { missions: updatedMissions });
+    await updateDoc(userRef, { missions: acceptedOnly });
   };
 
-  // Update mission progress
+  // ✅ Update progress
   const updateMissionProgress = async (missionId: string, progress: number) => {
     if (!user) return;
+
     const updatedMissions = missions.map((mission) =>
       mission.id === missionId ? { ...mission, progress: Math.min(100, progress) } : mission
     );
     setMissions(updatedMissions);
 
+    const acceptedOnly = updatedMissions.filter((m) => m.accepted);
     const userRef = doc(db, "users", user.uid);
-    await updateDoc(userRef, { missions: updatedMissions });
+    await updateDoc(userRef, { missions: acceptedOnly });
   };
 
   return (
@@ -166,6 +187,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         badges,
         loading,
         updateProfile,
+        acceptMission,
         completeMission,
         updateMissionProgress,
       }}

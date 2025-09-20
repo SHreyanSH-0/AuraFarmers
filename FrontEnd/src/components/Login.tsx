@@ -4,7 +4,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -20,59 +20,43 @@ const Login: React.FC = () => {
   const [primaryCrop, setPrimaryCrop] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError("");
-  setLoading(true);
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-  try {
-    if (isSignup) {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+    try {
+      if (isSignup) {
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+        const user = userCredential.user;
 
-      // 🔹 Create default profile in Firestore
-      await setDoc(doc(db, "users", user.uid), {
-        profile: {
-          name: "",
-          location: "",
-          farmSize: "",
-          primaryCrop: "",
-          sustainabilityScore: 0,
-          level: 1,
-          totalPoints: 0,
-          rank: 0,
-        },
-        missions: [
-          {
-            id: "1",
-            title: "Organic Pest Control Challenge",
-            description: "Use neem oil spray for 2 weeks instead of chemical pesticides",
-            category: "organic",
-            points: 150,
-            duration: "2 weeks",
-            difficulty: "easy",
-            completed: false,
-            progress: 0,
+        // ✅ Save signup form values into Firestore
+        await setDoc(doc(db, "users", user.uid), {
+          profile: {
+            name: name,
+            location: location,
+            farmSize: farmSize,
+            primaryCrop: primaryCrop,
+            sustainabilityScore: 0,
+            level: 1,
+            totalPoints: 0,
+            rank: 0,
           },
-        ],
-        badges: [
-          {
-            id: "1",
-            name: "Getting Started",
-            icon: "🌱",
-            description: "Completed your first mission",
-            earned: false,
-          },
-        ],
-      });
-    } else {
-      await signInWithEmailAndPassword(auth, email, password);
+          missions: [],
+          badges: [],
+        });
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-  } catch (err: any) {
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-green-100 px-4">

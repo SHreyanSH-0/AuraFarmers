@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { doc, getDoc, setDoc, updateDoc, collection, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 
@@ -51,9 +51,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const useUser = () => {
   const context = useContext(UserContext);
-  if (!context) {
-    throw new Error("useUser must be used within a UserProvider");
-  }
+  if (!context) throw new Error("useUser must be used within a UserProvider");
   return context;
 };
 
@@ -80,16 +78,13 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
 
-        let userData: any = {};
         if (userSnap.exists()) {
-          userData = userSnap.data();
+          const userData = userSnap.data();
           setProfile(userData.profile || null);
           setBadges(userData.badges || []);
-        } else {
-          await setDoc(userRef, { profile: {}, missions: [], badges: [] });
         }
 
-        // ✅ Fetch global missions
+        // Fetch global missions
         unsubMissions = onSnapshot(collection(db, "missions"), (snapshot) => {
           const globalMissions = snapshot.docs.map(
             (docSnap) =>
@@ -99,11 +94,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               } as Omit<Mission, "completed" | "progress" | "accepted">)
           );
 
-          // ✅ Merge with only the user’s accepted missions
-          const userAcceptedMissions: Mission[] = userData.missions || [];
+          const userMissions: Mission[] = (userSnap.data()?.missions || []).map((m: Mission) => m);
 
           const merged: Mission[] = globalMissions.map((gm) => {
-            const progressData = userAcceptedMissions.find((m) => m.id === gm.id);
+            const progressData = userMissions.find((m) => m.id === gm.id);
             return {
               ...gm,
               completed: progressData?.completed || false,
@@ -127,7 +121,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [user]);
 
-  // ✅ Update profile
+  // Update profile
   const updateProfile = async (newProfile: Partial<UserProfile>) => {
     if (!user) return;
     const userRef = doc(db, "users", user.uid);
@@ -136,10 +130,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await updateDoc(userRef, { profile: updated });
   };
 
-  // ✅ Accept mission (only add this mission to user doc, don’t overwrite global list)
   const acceptMission = async (missionId: string) => {
     if (!user) return;
-
     const updatedMissions = missions.map((mission) =>
       mission.id === missionId ? { ...mission, accepted: true, progress: 0 } : mission
     );
@@ -148,13 +140,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const acceptedOnly = updatedMissions.filter((m) => m.accepted);
     const userRef = doc(db, "users", user.uid);
     await updateDoc(userRef, { missions: acceptedOnly });
-    
   };
 
-  // ✅ Complete mission
   const completeMission = async (missionId: string) => {
     if (!user) return;
-
     const updatedMissions = missions.map((mission) =>
       mission.id === missionId ? { ...mission, completed: true, progress: 100 } : mission
     );
@@ -165,10 +154,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await updateDoc(userRef, { missions: acceptedOnly });
   };
 
-  // ✅ Update progress
   const updateMissionProgress = async (missionId: string, progress: number) => {
     if (!user) return;
-
     const updatedMissions = missions.map((mission) =>
       mission.id === missionId ? { ...mission, progress: Math.min(100, progress) } : mission
     );

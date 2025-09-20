@@ -142,17 +142,20 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await updateDoc(userRef, { missions: acceptedOnly });
   };
 
-  const completeMission = async (missionId: string) => {
-    if (!user) return;
-    const updatedMissions = missions.map((mission) =>
-      mission.id === missionId ? { ...mission, completed: true, progress: 100 } : mission
-    );
-    setMissions(updatedMissions);
+ const completeMission = async (missionId: string) => {
+  if (!user) return;
 
-    const acceptedOnly = updatedMissions.filter((m) => m.accepted);
-    const userRef = doc(db, "users", user.uid);
-    await updateDoc(userRef, { missions: acceptedOnly });
-  };
+  const updatedMissions = missions.map((mission) =>
+    mission.id === missionId
+      ? { ...mission, completed: true, progress: 100, accepted: true }
+      : mission
+  );
+
+  setMissions(updatedMissions);
+
+  const userRef = doc(db, "users", user.uid);
+  await updateDoc(userRef, { missions: updatedMissions });
+};
 
   const updateMissionProgress = async (missionId: string, progress: number) => {
     if (!user) return;

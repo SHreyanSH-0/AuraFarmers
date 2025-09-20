@@ -20,7 +20,8 @@ interface ProgressCardProps {
 }
 
 const ProgressCard: React.FC<ProgressCardProps> = ({ mission, icon: Icon }) => {
-  const { updateMissionProgress } = useUser();
+  // ✅ hooks must be inside component
+  const { updateMissionProgress, completeMission } = useUser();
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -82,7 +83,7 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ mission, icon: Icon }) => {
           />
         </div>
 
-        {!mission.completed && (
+        {!mission.completed ? (
           <div className="flex space-x-2 pt-2">
             <button
               onClick={() => updateMissionProgress(mission.id, mission.progress + 10)}
@@ -91,10 +92,19 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ mission, icon: Icon }) => {
               Update Progress
             </button>
             {mission.progress >= 90 && (
-              <button className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200 transition-colors">
+              <button
+                onClick={() => completeMission(mission.id)}
+                className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200 transition-colors"
+              >
                 Mark Complete
               </button>
             )}
+          </div>
+        ) : (
+          <div className="pt-2">
+            <span className="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded-full">
+              Completed
+            </span>
           </div>
         )}
       </div>

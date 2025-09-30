@@ -1,17 +1,20 @@
-import React from 'react';
-import { Clock, Star } from 'lucide-react';
-import { useUser } from '../context/UserContext';
+import React, { useState } from "react";
+import { Clock, Star } from "lucide-react";
+import { useUser } from "../context/UserContext";
+import Confetti from "react-confetti";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Mission {
   id: string;
   title: string;
   description: string;
-  category: 'organic' | 'water' | 'soil' | 'biodiversity';
+  category: "organic" | "water" | "soil" | "biodiversity";
   points: number;
   duration: string;
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: "easy" | "medium" | "hard";
   completed: boolean;
   progress: number;
+  accepted: boolean;
 }
 
 interface ProgressCardProps {
@@ -20,33 +23,54 @@ interface ProgressCardProps {
 }
 
 const ProgressCard: React.FC<ProgressCardProps> = ({ mission, icon: Icon }) => {
-  // ✅ hooks must be inside component
   const { updateMissionProgress, completeMission } = useUser();
+  const [showConfetti, setShowConfetti] = useState(false);
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'easy': return 'text-green-600 bg-green-100';
-      case 'medium': return 'text-yellow-600 bg-yellow-100';
-      case 'hard': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case "easy":
+        return "text-green-600 bg-green-100";
+      case "medium":
+        return "text-yellow-600 bg-yellow-100";
+      case "hard":
+        return "text-red-600 bg-red-100";
+      default:
+        return "text-gray-600 bg-gray-100";
     }
   };
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'organic': return 'text-green-600 bg-green-100';
-      case 'water': return 'text-blue-600 bg-blue-100';
-      case 'soil': return 'text-amber-600 bg-amber-100';
-      case 'biodiversity': return 'text-emerald-600 bg-emerald-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case "organic":
+        return "text-green-600 bg-green-100";
+      case "water":
+        return "text-blue-600 bg-blue-100";
+      case "soil":
+        return "text-amber-600 bg-amber-100";
+      case "biodiversity":
+        return "text-emerald-600 bg-emerald-100";
+      default:
+        return "text-gray-600 bg-gray-100";
     }
   };
 
+  const handleComplete = async () => {
+    setShowConfetti(true);
+    await completeMission(mission.id); // ✅ mark complete + add points
+    setTimeout(() => setShowConfetti(false), 3000);
+  };
+
   return (
-    <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+    <div className="relative border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+      {/* 🎉 Confetti */}
+      {showConfetti && <Confetti recycle={false} numberOfPieces={250} />}
+
+      {/* Top section */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center space-x-3">
-          <div className={`p-2 rounded-lg ${getCategoryColor(mission.category)}`}>
+          <div
+            className={`p-2 rounded-lg ${getCategoryColor(mission.category)}`}
+          >
             <Icon className="h-5 w-5" />
           </div>
           <div>
@@ -55,12 +79,17 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ mission, icon: Icon }) => {
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getDifficultyColor(mission.difficulty)}`}>
+          <span
+            className={`px-2 py-1 text-xs font-medium rounded-full ${getDifficultyColor(
+              mission.difficulty
+            )}`}
+          >
             {mission.difficulty}
           </span>
         </div>
       </div>
 
+      {/* Progress + Actions */}
       <div className="space-y-3">
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center space-x-4">
@@ -83,28 +112,39 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ mission, icon: Icon }) => {
           />
         </div>
 
-        {!mission.completed ? (
+        {/* ✅ Completed state */}
+        {mission.completed ? (
+          <AnimatePresence>
+            <motion.div
+              className="pt-2"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              <span className="inline-block text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full shadow-sm">
+                ✅ Completed
+              </span>
+            </motion.div>
+          </AnimatePresence>
+        ) : (
           <div className="flex space-x-2 pt-2">
             <button
-              onClick={() => updateMissionProgress(mission.id, mission.progress + 10)}
+              onClick={() =>
+                updateMissionProgress(mission.id, mission.progress + 10)
+              }
               className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full hover:bg-green-200 transition-colors"
             >
               Update Progress
             </button>
             {mission.progress >= 90 && (
               <button
-                onClick={() => completeMission(mission.id)}
+                onClick={handleComplete}
                 className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200 transition-colors"
               >
-                Mark Complete
+                Mark Complete 🎉
               </button>
             )}
-          </div>
-        ) : (
-          <div className="pt-2">
-            <span className="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded-full">
-              Completed
-            </span>
           </div>
         )}
       </div>

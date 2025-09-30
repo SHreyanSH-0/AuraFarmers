@@ -1,5 +1,17 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { doc, getDoc, updateDoc, collection, onSnapshot } from "firebase/firestore";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  collection,
+  onSnapshot,
+} from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 
@@ -14,6 +26,11 @@ interface Mission {
   completed: boolean;
   progress: number;
   accepted: boolean;
+
+  // 🌱 New impact fields
+  waterSaved?: number; // liters
+  soilImproved?: number; // kg carbon
+  biodiversitySupported?: number; // species count
 }
 
 interface Badge {
@@ -36,6 +53,12 @@ interface UserProfile {
   rank: number;
 }
 
+interface ImpactSummary {
+  waterSaved: number;
+  soilImproved: number;
+  biodiversitySupported: number;
+}
+
 interface UserContextType {
   profile: UserProfile | null;
   missions: Mission[];
@@ -45,6 +68,7 @@ interface UserContextType {
   acceptMission: (missionId: string) => Promise<void>;
   completeMission: (missionId: string) => Promise<void>;
   updateMissionProgress: (missionId: string, progress: number) => Promise<void>;
+  impactSummary: ImpactSummary;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -55,7 +79,9 @@ export const useUser = () => {
   return context;
 };
 
-export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const UserProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
@@ -84,7 +110,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setBadges(userData.badges || []);
         }
 
-        // Fetch global missions
+        // Listen to global missions
         unsubMissions = onSnapshot(collection(db, "missions"), (snapshot) => {
           const globalMissions = snapshot.docs.map(
             (docSnap) =>
@@ -94,7 +120,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               } as Omit<Mission, "completed" | "progress" | "accepted">)
           );
 
-          const userMissions: Mission[] = (userSnap.data()?.missions || []).map((m: Mission) => m);
+          const userMissions: Mission[] =
+            (userSnap.data()?.missions || []).map((m: Mission) => m);
 
           const merged: Mission[] = globalMissions.map((gm) => {
             const progressData = userMissions.find((m) => m.id === gm.id);
@@ -133,7 +160,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const acceptMission = async (missionId: string) => {
     if (!user) return;
     const updatedMissions = missions.map((mission) =>
-      mission.id === missionId ? { ...mission, accepted: true, progress: 0 } : mission
+      mission.id === missionId
+        ? { ...mission, accepted: true, progress: 0 }
+        : mission
     );
     setMissions(updatedMissions);
 
@@ -142,25 +171,45 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await updateDoc(userRef, { missions: acceptedOnly });
   };
 
- const completeMission = async (missionId: string) => {
+const completeMission = async (missionId: string) => {
   if (!user) return;
 
-  const updatedMissions = missions.map((mission) =>
-    mission.id === missionId
-      ? { ...mission, completed: true, progress: 100, accepted: true }
-      : mission
-  );
+  // Find the mission being completed
+  const missionToComplete = missions.find((m) => m.id === missionId);
+  if (!missionToComplete) return;
 
+  const updatedMissions = missions.map((mission) =>
+    mission.id === missionId ? { ...mission, completed: true, progress: 100 } : mission
+  );
   setMissions(updatedMissions);
 
+  // ✅ Update points in user profile
+  let updatedProfile = profile;
+  if (updatedProfile && !missionToComplete.completed) {
+    updatedProfile = {
+      ...updatedProfile,
+      totalPoints: (updatedProfile.totalPoints || 0) + missionToComplete.points,
+    };
+    setProfile(updatedProfile);
+  }
+
   const userRef = doc(db, "users", user.uid);
-  await updateDoc(userRef, { missions: updatedMissions });
+  await updateDoc(userRef, {
+    missions: updatedMissions.filter((m) => m.accepted),
+    profile: updatedProfile,
+  });
 };
 
-  const updateMissionProgress = async (missionId: string, progress: number) => {
+
+  const updateMissionProgress = async (
+    missionId: string,
+    progress: number
+  ) => {
     if (!user) return;
     const updatedMissions = missions.map((mission) =>
-      mission.id === missionId ? { ...mission, progress: Math.min(100, progress) } : mission
+      mission.id === missionId
+        ? { ...mission, progress: Math.min(100, progress) }
+        : mission
     );
     setMissions(updatedMissions);
 
@@ -168,6 +217,19 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const userRef = doc(db, "users", user.uid);
     await updateDoc(userRef, { missions: acceptedOnly });
   };
+
+  // 🌍 Calculate environmental impact
+  const impactSummary = missions.reduce(
+    (acc, mission) => {
+      if (mission.completed) {
+        acc.waterSaved += mission.waterSaved || 0;
+        acc.soilImproved += mission.soilImproved || 0;
+        acc.biodiversitySupported += mission.biodiversitySupported || 0;
+      }
+      return acc;
+    },
+    { waterSaved: 0, soilImproved: 0, biodiversitySupported: 0 }
+  );
 
   return (
     <UserContext.Provider
@@ -180,6 +242,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         acceptMission,
         completeMission,
         updateMissionProgress,
+        impactSummary,
       }}
     >
       {children}

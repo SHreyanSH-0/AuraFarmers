@@ -1,120 +1,55 @@
 import React from "react";
-import {
-  TrendingUp,
-  Award,
-  Target,
-  Users,
-  Droplets,
-  Leaf,
-  Voicemail as Soil,
-  Bug,
-} from "lucide-react";
 import { useUser } from "../context/UserContext";
 import ProgressCard from "../components/ProgressCard";
-import BadgeDisplay from "../components/BadgeDisplay";
+import ImpactCard from "../components/ImpactCard";
 
 const Dashboard: React.FC = () => {
-  const { profile, missions, badges, loading } = useUser();
+  const { profile, missions, loading } = useUser();
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600"></div>
-      </div>
-    );
-  }
+  if (loading) return <p className="text-center text-gray-600">Loading...</p>;
 
-  if (!profile) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen text-gray-600">
-        <p className="text-lg">No profile found.</p>
-        <p className="text-sm text-gray-500">Please complete signup.</p>
-      </div>
-    );
-  }
-
-  const activeMissions = missions.filter((m) => m.accepted && !m.completed);
-  const completedMissions = missions.filter((m) => m.completed);
-  const earnedBadges = badges.filter((b) => b.earned);
-
-  const categoryIcons = {
-    organic: Bug,
-    water: Droplets,
-    soil: Soil,
-    biodiversity: Leaf,
-  };
-
-  const levelProgress = ((profile.totalPoints ?? 0) % 1000) / 10;
+  const acceptedMissions = missions.filter((m) => m.accepted);
 
   return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl p-6 text-white">
-        <h1 className="text-2xl font-bold mb-2">Welcome back, {profile.name || "Farmer"}!</h1>
-        <p className="text-green-100">Continue your sustainable farming journey</p>
+    <div className="p-6 md:p-10 bg-gray-50 min-h-screen space-y-8">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-green-600 to-emerald-500 rounded-2xl p-6 shadow-md text-white">
+        <h1 className="text-3xl font-bold">Welcome back, {profile?.name} 👋</h1>
+        <p className="text-green-100 mt-2">
+          Let’s continue making a positive impact today!
+        </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Sustainability */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100">
-          <p className="text-sm text-gray-600">Sustainability Score</p>
-          <p className="text-2xl font-bold text-green-600">{profile.sustainabilityScore ?? 0}</p>
+      {/* Missions Section */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">
+            🌱 Your Active Missions
+          </h2>
+          <span className="text-sm text-gray-500">
+            {acceptedMissions.length} active
+          </span>
         </div>
 
-        {/* Level */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100">
-          <p className="text-sm text-gray-600">Level</p>
-          <p className="text-2xl font-bold text-green-600">{profile.level ?? 1}</p>
-          <div className="mt-2 bg-green-100 rounded-full h-2">
-            <div className="bg-green-600 rounded-full h-2" style={{ width: `${levelProgress}%` }} />
-          </div>
-        </div>
-
-        {/* Active Missions */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100">
-          <p className="text-sm text-gray-600">Active Missions</p>
-          <p className="text-2xl font-bold text-green-600">{activeMissions.length}</p>
-        </div>
-
-        {/* Rank */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100">
-          <p className="text-sm text-gray-600">Community Rank</p>
-          <p className="text-2xl font-bold text-green-600">#{profile.rank ?? 0}</p>
-        </div>
-      </div>
-
-      {/* Active Missions */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Active Missions</h2>
-        {activeMissions.length > 0 ? (
-          <div className="space-y-4">
-            {activeMissions.slice(0, 3).map((mission) => {
-              const IconComponent = categoryIcons[mission.category];
-              return <ProgressCard key={mission.id} mission={mission} icon={IconComponent} />;
-            })}
+        {acceptedMissions.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm p-6 text-center border border-gray-200">
+            <p className="text-gray-600">
+              You haven’t accepted any missions yet. Head over to the{" "}
+              <span className="font-semibold text-green-600">Missions</span>{" "}
+              page to get started!
+            </p>
           </div>
         ) : (
-          <p className="text-gray-500">No active missions yet.</p>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {acceptedMissions.map((mission) => (
+              <ProgressCard key={mission.id} mission={mission} icon={() => <></>} />
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Achievements + Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Recent Achievements</h2>
-          {earnedBadges.length > 0 ? (
-            earnedBadges.slice(0, 3).map((badge) => <BadgeDisplay key={badge.id} badge={badge} />)
-          ) : (
-            <p className="text-gray-500">No badges earned yet.</p>
-          )}
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Progress Summary</h2>
-          <p>Missions Completed: {completedMissions.length}/{missions.length}</p>
-          <p>Badges Earned: {earnedBadges.length}/{badges.length}</p>
-          <p>Total Points: {(profile.totalPoints ?? 0).toLocaleString()}</p>
-        </div>
-      </div>
+      {/* Impact Section */}
+      <ImpactCard />
     </div>
   );
 };
